@@ -38,17 +38,22 @@ jobs:
       - name: Build Windows artifacts
         run: pnpm dist:win
 
-      - name: Create GitHub prerelease
+      - name: Prepare release tag
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           VERSION="$(node -pe "require('./package.json').version")"
           TAG="v${VERSION}-p0-test-$(date -u +%Y%m%d%H%M%S)"
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
           echo "Release tag: ${TAG}"
           ls -lh pack
-          gh release create "$TAG" pack/* \
-            --title "$TAG (Windows test build)" \
-            --notes "Temporary Windows-only test build from branch perf/p0-startup. Not an official release." \
-            --prerelease
+
+      - name: Create GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }} (Windows test build)
+          body: Temporary Windows-only test build from branch perf/p0-startup. Not an official release.
+          prerelease: true
+          files: pack/*
+          fail_on_unmatched_files: true
