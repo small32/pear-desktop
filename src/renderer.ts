@@ -436,8 +436,9 @@ const definePearTransElements = () => {
 };
 
 const preload = async () => {
-  await loadI18n();
-  await setLanguage(window.mainConfig.get('options.language') ?? 'en');
+  const language = window.mainConfig.get('options.language') ?? 'en';
+  await loadI18n(language);
+  await setLanguage(language);
   window.i18n = {
     t: i18t.bind(i18next),
   };

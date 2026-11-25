@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { basename, resolve, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { globSync } from 'glob';
-import { Project } from 'ts-morph';
+import { Node, Project, ts } from 'ts-morph';
 
 // HACK: DO NOT USE @ ALIAS IN THIS FILE, IT WILL CAUSE PROBLEMS
 import { Platform } from '../src/types/plugins';
@@ -133,6 +134,78 @@ export const pluginVirtualModuleGenerator = (
   );
 
   return src.getText();
+};
+
+// Build-time extraction of each plugin's default `enabled` value. This lets
+// config.plugins.isEnabled() answer without importing all plugin modules,
+// which previously blocked module evaluation with a top-level await.
+export const pluginDefaultsImporter = () => {
+  const srcPath = resolve(__dirname, '..', 'src');
+  const plugins = globSync([
+    'src/plugins/*/index.{js,ts,jsx,tsx}',
+    'src/plugins/*.{js,ts,jsx,tsx}',
+    '!src/plugins/utils/**/*',
+    '!src/plugins/utils/*',
+  ]).map((path) => {
+    let name = basename(path);
+    if (
+      name === 'index.ts' ||
+      name === 'index.js' ||
+      name === 'index.jsx' ||
+      name === 'index.tsx'
+    ) {
+      name = basename(resolve(path, '..'));
+    }
+    return { name: name.replace(extname(name), ''), path };
+  });
+
+  const defaults: Record<string, boolean> = {};
+  for (const { name, path } of plugins) {
+    const virtualName = `vm:defaults_${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const source = globalProject.createSourceFile(
+      virtualName,
+      readFileSync(resolve(srcPath, '..', path), 'utf8'),
+      { overwrite: true },
+    );
+
+    const candidates: Node[] = [];
+    const exportAssignment = source.getExportAssignment(
+      (assignment) => !assignment.isExportEquals(),
+    );
+    if (exportAssignment) candidates.push(exportAssignment.getExpression());
+    candidates.push(...(source.getExportedDeclarations().get('default') ?? []));
+
+    let enabled = false;
+    for (const candidate of candidates) {
+      let expression = candidate;
+      if (
+        Node.isCallExpression(expression) &&
+        expression.getExpression().getText() === 'createPlugin'
+      ) {
+        const args = expression.getArguments();
+        if (args.length > 0) expression = args[0];
+      }
+      if (!Node.isObjectLiteralExpression(expression)) continue;
+
+      const configProp = expression.getProperty('config');
+      if (!configProp || !Node.isPropertyAssignment(configProp)) continue;
+      const configInit = configProp.getInitializer();
+      if (!configInit || !Node.isObjectLiteralExpression(configInit)) continue;
+
+      const enabledProp = configInit.getProperty('enabled');
+      if (!enabledProp || !Node.isPropertyAssignment(enabledProp)) continue;
+      const enabledInit = enabledProp.getInitializer();
+      enabled = enabledInit?.getKind() === ts.SyntaxKind.TrueKeyword;
+      break;
+    }
+
+    defaults[name] = enabled;
+    source.forget();
+  }
+
+  // Virtual modules are parsed as JavaScript; types are declared in
+  // src/virtual-module.d.ts instead of being emitted here.
+  return `export const pluginEnabledDefaults = ${JSON.stringify(defaults)};`;
 };
 
 function supportsPlatform({ platform }: { platform: string }) {

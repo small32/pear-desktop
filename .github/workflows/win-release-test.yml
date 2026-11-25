@@ -1,0 +1,54 @@
+name: Windows Release (temporary test)
+
+# Temporary, fork-only workflow: builds Windows installers from the
+# perf/p0-startup branch and publishes them as a prerelease.
+on:
+  push:
+    branches: [ perf/p0-startup ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "24.x"
+
+jobs:
+  windows-release:
+    name: Build and publish Windows test release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+        with:
+          version: 12
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows artifacts
+        run: pnpm dist:win
+
+      - name: Create GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -pe "require('./package.json').version")"
+          TAG="v${VERSION}-p0-test-$(date -u +%Y%m%d%H%M%S)"
+          echo "Release tag: ${TAG}"
+          ls -lh pack
+          gh release create "$TAG" pack/* \
+            --title "$TAG (Windows test build)" \
+            --notes "Temporary Windows-only test build from branch perf/p0-startup. Not an official release." \
+            --prerelease

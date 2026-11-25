@@ -2,7 +2,6 @@ import {
   contextBridge,
   ipcRenderer,
   type IpcRendererEvent,
-  webFrame,
 } from 'electron';
 import is from 'electron-is';
 
@@ -38,8 +37,9 @@ new MutationObserver((mutations, observer) => {
   }
 }).observe(document, { subtree: true, childList: true });
 
-loadI18n().then(async () => {
-  await setLanguage(config.get('options.language') ?? 'en');
+const language = config.get('options.language') ?? 'en';
+loadI18n(language).then(async () => {
+  await setLanguage(language);
   await loadAllPreloadPlugins();
 });
 
@@ -83,27 +83,3 @@ contextBridge.exposeInMainWorld(
   'ELECTRON_RENDERER_URL',
   process.env.ELECTRON_RENDERER_URL,
 );
-
-const [path, script] = ipcRenderer.sendSync('get-renderer-script') as [
-  string | null,
-  string,
-];
-let blocked = true;
-if (path) {
-  webFrame.executeJavaScriptInIsolatedWorld(
-    0,
-    [
-      {
-        code: script,
-        url: path,
-      },
-    ],
-    true,
-    () => (blocked = false),
-  );
-} else {
-  webFrame.executeJavaScript(script, true, () => (blocked = false));
-}
-
-// HACK: Wait for the script to be executed
-while (blocked);

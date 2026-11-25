@@ -12,8 +12,19 @@ declare module 'virtual:plugins' {
   >;
 }
 
+declare module 'virtual:plugin-defaults' {
+  export const pluginEnabledDefaults: Record<string, boolean>;
+}
+
 declare module 'virtual:i18n' {
   import type { LanguageResources } from '@/i18n/resources/@types';
 
-  export const languageResources: () => Promise<LanguageResources>;
+  export const languageCodes: string[];
+  export const languageMetadata: Record<
+    string,
+    { 'name'?: string; 'local-name'?: string }
+  >;
+  export const languageResources: (
+    language?: string,
+  ) => Promise<LanguageResources>;
 }

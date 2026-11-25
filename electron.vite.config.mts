@@ -14,7 +14,10 @@ import viteResolve from 'vite-plugin-resolve';
 import solidPlugin from 'vite-plugin-solid';
 
 import { i18nImporter } from './vite-plugins/i18n-importer.mjs';
-import { pluginVirtualModuleGenerator } from './vite-plugins/plugin-importer.mjs';
+import {
+  pluginDefaultsImporter,
+  pluginVirtualModuleGenerator,
+} from './vite-plugins/plugin-importer.mjs';
 import pluginLoader from './vite-plugins/plugin-loader.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +37,7 @@ export default defineConfig(({ mode }) => {
       viteResolve({
         'virtual:i18n': i18nImporter(),
         'virtual:plugins': pluginVirtualModuleGenerator('main'),
+        'virtual:plugin-defaults': pluginDefaultsImporter(),
       }),
     ],
     publicDir: 'assets',
@@ -77,6 +81,7 @@ export default defineConfig(({ mode }) => {
       viteResolve({
         'virtual:i18n': i18nImporter(),
         'virtual:plugins': pluginVirtualModuleGenerator('preload'),
+        'virtual:plugin-defaults': pluginDefaultsImporter(),
       }),
     ],
     build: {
@@ -109,6 +114,7 @@ export default defineConfig(({ mode }) => {
       viteResolve({
         'virtual:i18n': i18nImporter(),
         'virtual:plugins': pluginVirtualModuleGenerator('renderer'),
+        'virtual:plugin-defaults': pluginDefaultsImporter(),
       }),
       withFilter(solidPlugin(), {
         load: { id: [/\.(tsx|jsx)$/, '/@solid-refresh'] },
