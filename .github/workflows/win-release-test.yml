@@ -52,6 +52,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           name: ${{ env.TAG }} (Windows test build)
           body: Temporary Windows-only test build from branch perf/p0-startup. Not an official release.
           prerelease: true
